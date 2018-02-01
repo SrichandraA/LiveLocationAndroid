@@ -1,0 +1,30 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    >
+    <fragment
+        xmlns:map="http://schemas.android.com/apk/res-auto"
+        android:id="@+id/map"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="chandu.sharelocation.MapsActivity" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:text="Share Live Location"
+        android:id="@+id/btn"
+        android:layout_alignParentBottom="true"
+        android:layout_centerInParent="true"
+        android:layout_margin="15dp"
+        android:elevation="7dp"
+        android:visibility="gone"
+        style="@style/Widget.AppCompat.Button.Colored"
+        android:background="#000000"
+        android:paddingRight="10dp"
+        android:paddingLeft="10dp"
+        />
+</RelativeLayout>
+

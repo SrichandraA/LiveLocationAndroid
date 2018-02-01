@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">ShareLocation</string>
+    <string name="title_activity_maps">Map</string>
+    <string-array name="time">
+        <item>5</item>
+        <item>15</item>
+        <item>30</item>
+        <item>45</item>
+        <item>60</item>
+        <item>75</item>
+        <item>90</item>
+        <item>105</item>
+        <item>120</item>
+        <item>135</item>
+        <item>150</item>
+        <item>165</item>
+
+    </string-array>
+</resources>
