@@ -3,9 +3,12 @@ package chandu.sharelocation;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
@@ -21,6 +24,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v7.app.NotificationCompat;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -35,6 +39,10 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -60,16 +68,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public Button bottomSheetBtn;
     private Boolean onOff=true;
     private Boolean isTicking=false;
+    private int id=0;
     private CountDownTimer countDownTimer;
     private MarkerOptions marker=null;
+    private  Button share,send;
+    BroadcastReceiver broadcastReceiver;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         bottomSheetBtn=(Button)findViewById(R.id.btn);
+
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+
     }
 
 
@@ -97,49 +111,52 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } else {
             mLocationPermission = true;
             mMap.setMyLocationEnabled(true);
-            checkLocationOn();
-
-        }
-    }
-
-    protected void checkLocationOn() {
-
-        locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(context);
-            builder.setTitle("GPS NOT FOUND");  // GPS not found
-            builder.setMessage("Do you want to enable GPS..?"); // Want to enable?
-            builder.setPositiveButton("YES", new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    startActivityForResult(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1000);
-
-                }
-            });
-            builder.setNegativeButton("NO", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    Toast.makeText(MapsActivity.this, "Please turn on GPS", Toast.LENGTH_SHORT).show();
-                    checkLocationOn();
-                }
-            });
-            builder.create().show();
-
-        } else {
-            mLocationOn = true;
-            Toast.makeText(MapsActivity.this, "Fetching your location..!", Toast.LENGTH_SHORT).show();
-
+            //checkLocationOn();
             allSet();
 
         }
     }
 
+//    protected void checkLocationOn() {
+//        locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+//
+//        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+//            AlertDialog.Builder builder = new AlertDialog.Builder(context);
+//            builder.setTitle("GPS NOT FOUND");  // GPS not found
+//            builder.setMessage("Do you want to enable GPS..?"); // Want to enable?
+//            builder.setPositiveButton("YES", new DialogInterface.OnClickListener() {
+//                public void onClick(DialogInterface dialogInterface, int i) {
+//                    startActivityForResult(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1000);
+//
+//                }
+//            });
+//            builder.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+//                @Override
+//                public void onClick(DialogInterface dialog, int which) {
+//                    Toast.makeText(MapsActivity.this, "Please turn on GPS", Toast.LENGTH_SHORT).show();
+//                    checkLocationOn();
+//                }
+//            });
+//            builder.create().show();
+//
+//        } else {
+//            mLocationOn = true;
+//            Toast.makeText(MapsActivity.this, "Fetching your location..!", Toast.LENGTH_SHORT).show();
+//            allSet();
+//
+//        }
+//    }
+
     protected void allSet() {
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
         }
+
         final ProgressDialog progressDialog = new ProgressDialog(MapsActivity.this);
         progressDialog.setMessage("Fetching your location..!");
         progressDialog.show();
+        locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, new LocationListener() {
             @Override
             public void onLocationChanged(final Location location) {
@@ -147,6 +164,68 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 double latitude = location.getLatitude();
                 double longitude = location.getLongitude();
                 LatLng latLng = new LatLng(latitude,longitude);
+                Retrofit retrofit =new Retrofit.Builder()
+                        .baseUrl("http://testbed2.riktamtech.com:3000")
+                        .addConverterFactory(GsonConverterFactory.create())
+                        .build();
+                final ServiceApi serviceApi=retrofit.create(ServiceApi.class);
+                Retrofit retrofit2 =new Retrofit.Builder()
+                        .baseUrl("http://testbed2.riktamtech.com:3000")
+                        .build();
+                final ServiceApi serviceApi2=retrofit2.create(ServiceApi.class);
+                if(isTicking) {
+                    Log.v("insideticking:",String.valueOf(id));
+
+                    if(id==0){
+                        Log.v("if id 0:",String.valueOf(id));
+
+                        Call<ResponseBody> call = serviceApi2.insertLocation(location.getLatitude(),location.getLongitude());
+                        call.enqueue(new Callback<ResponseBody>() {
+                            @Override
+                            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                                try {
+                                    JSONArray jsonArray = new JSONArray(response.body().string());
+                                    JSONObject jsonObject = jsonArray.getJSONObject(0);
+                                    id=jsonObject.getInt("MAX");
+                                    share.setText("Click to stop sharing");
+                                    send.setVisibility(View.VISIBLE);
+                                    Log.v("create:",String.valueOf(id));
+
+                                } catch (JSONException e) {
+                                    e.printStackTrace();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+
+                            }
+
+                            @Override
+                            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                                Toast.makeText(MapsActivity.this,"Network N.A, Trying again please wait..!",Toast.LENGTH_SHORT).show();
+                                share.setText("Click to stop Ticking");
+                                send.setVisibility(View.VISIBLE);
+                            }
+                        });
+                    }else {
+                    Call<ResponseBody> call = serviceApi.updateLocation(id, location.getLatitude(), location.getLongitude());
+                    call.enqueue(new Callback<ResponseBody>() {
+                        @Override
+                        public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                            share.setText("Click to stop sharing");
+                            send.setVisibility(View.VISIBLE);
+
+                        }
+
+                        @Override
+                        public void onFailure(Call<ResponseBody> call, Throwable t) {
+
+                            Toast.makeText(MapsActivity.this,"Network N.A, Trying again please wait..!",Toast.LENGTH_SHORT).show();
+                            share.setText("Click to stop Ticking");
+                            send.setVisibility(View.VISIBLE);
+                        }
+                    });
+                    }
+                }
                 if(marker==null){
                     marker= new MarkerOptions().position(latLng).title("marker");
 
@@ -162,8 +241,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     mMap.addMarker(marker);
 
                 }
-//                mMap.addMarker(new MarkerOptions().position(latLng).title("marker"));
-//                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng,10.2f ));
                 bottomSheetBtn.setVisibility(View.VISIBLE);
                 progressDialog.dismiss();
                 bottomSheetBtn.setOnClickListener(new View.OnClickListener() {
@@ -177,8 +254,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         bottomSheetBehavior.setPeekHeight(
                                 (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,100,getResources().getDisplayMetrics())
                         );
-                        final Button share = (Button) parentView.findViewById(R.id.share);
-                        final Button send =(Button) parentView.findViewById(R.id.send);
+                         share = (Button) parentView.findViewById(R.id.share);
+                        send =(Button) parentView.findViewById(R.id.send);
 
                         if(isTicking){
                             share.setText("Click to stop sharing");
@@ -191,11 +268,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 R.array.time,android.R.layout.simple_spinner_item);
                         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                         timeSpinner.setAdapter(adapter);
-                        Retrofit retrofit =new Retrofit.Builder()
-                                .baseUrl("http://testbed2.riktamtech.com:3000")
-                                .addConverterFactory(GsonConverterFactory.create())
-                                .build();
-                        final ServiceApi serviceApi=retrofit.create(ServiceApi.class);
+
 
                         send.setOnClickListener(new View.OnClickListener() {
                             @Override
@@ -203,7 +276,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 Intent sendIntent = new Intent();
                                 sendIntent.setAction(Intent.ACTION_SEND);
                                 sendIntent.putExtra(Intent.EXTRA_TEXT, "Hi ! Link for my live location... " +
-                                        "http://testbed2.riktamtech.com:3000/googleMap");
+                                        "http://testbed2.riktamtech.com:3000/googleMap/"+id);
                                 sendIntent.setType("text/plain");
                                 startActivity(sendIntent);
                             }
@@ -217,32 +290,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                                 if(onOff){
                                     onOff=false;
+                                    Intent i =new Intent(MapsActivity.this,GPS_Service.class);
+                                    startService(i);
                                     countDownTimer = new CountDownTimer(Integer.parseInt(timeSpinner.getSelectedItem().toString())*60*1000, 15000) {
 
                                         public void onTick(final long millisUntilFinished) {
 
-                                            Call<ResponseBody> call = serviceApi.updateLocation(1,location.getLatitude(),location.getLongitude());
-                                            call.enqueue(new Callback<ResponseBody>() {
-                                                @Override
-                                                public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-                                                    Toast.makeText(MapsActivity.this,millisUntilFinished / 1000 +" sec remaining..",Toast.LENGTH_SHORT).show();
-                                                    share.setText("Click to stop sharing");
-                                                    isTicking=true;
-                                                    send.setVisibility(View.VISIBLE);
-                                                }
+                                            Toast.makeText(MapsActivity.this,millisUntilFinished / 1000 +" sec remaining..",Toast.LENGTH_SHORT).show();
 
-                                                @Override
-                                                public void onFailure(Call<ResponseBody> call, Throwable t) {
-                                                    Toast.makeText(MapsActivity.this,"Network failure..",Toast.LENGTH_SHORT).show();
-                                                    share.setText("share");
-                                                    isTicking=false;
-                                                    onOff=true;
-                                                    send.setVisibility(View.GONE);
-                                                    countDownTimer.cancel();
-                                                }
-                                            });
-
-
+                                            isTicking=true;
 
                                         }
 
@@ -251,17 +307,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                             isTicking=false;
                                             onOff=true;
                                             send.setVisibility(View.GONE);
-                                            Call<ResponseBody> call = serviceApi.updateLocation(1,0.0,0.0);
+                                            Call<ResponseBody> call = serviceApi.updateLocation(id,0.0,0.0);
                                             call.enqueue(new Callback<ResponseBody>() {
                                                 @Override
                                                 public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                                                     Toast.makeText(MapsActivity.this,"Done sharing..!",Toast.LENGTH_SHORT).show();
-
+                                                    Intent i = new Intent(MapsActivity.this,GPS_Service.class);
+                                                    stopService(i);
                                                 }
 
                                                 @Override
                                                 public void onFailure(Call<ResponseBody> call, Throwable t) {
                                                     Toast.makeText(MapsActivity.this,"Done sharing but couldn't reset location..!",Toast.LENGTH_SHORT).show();
+                                                    Intent i = new Intent(MapsActivity.this,GPS_Service.class);
+                                                    stopService(i);
 
                                                 }
                                             });
@@ -276,19 +335,23 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     countDownTimer.cancel();
                                     share.setText("share");
                                     send.setVisibility(View.GONE);
-                                   Call<ResponseBody> call = serviceApi.updateLocation(1,0.0,0.0);
-                                    call.enqueue(new Callback<ResponseBody>() {
-                                        @Override
-                                        public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                                    Intent i = new Intent(MapsActivity.this,GPS_Service.class);
+                                    stopService(i);
+                                    if(id !=0) {
+                                        Call<ResponseBody> call = serviceApi.updateLocation(id, 0.0, 0.0);
+                                        call.enqueue(new Callback<ResponseBody>() {
+                                            @Override
+                                            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                                            }
 
-                                        }
-
-                                        @Override
-                                        public void onFailure(Call<ResponseBody> call, Throwable t) {
-                                            Toast.makeText(MapsActivity.this,"Network failure couldn't reset location..!",Toast.LENGTH_SHORT).show();
-
-                                        }
-                                    });
+                                            @Override
+                                            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                                                Toast.makeText(MapsActivity.this, "Network failure couldn't reset location..!", Toast.LENGTH_SHORT).show();
+                                                Intent i = new Intent(MapsActivity.this, GPS_Service.class);
+                                                stopService(i);
+                                            }
+                                        });
+                                    }
                                     Toast.makeText(MapsActivity.this,"Stopped",Toast.LENGTH_SHORT).show();
 
                                 }
@@ -313,7 +376,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             @Override
             public void onProviderDisabled(String provider) {
-
+                Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
             }
         });
     }
@@ -332,11 +397,35 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
             else{
                 Toast.makeText(MapsActivity.this,"Please turn on GPS",Toast.LENGTH_SHORT).show();
-                checkLocationOn();
+               // checkLocationOn();
 
             }
         }
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(broadcastReceiver == null){
+            broadcastReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+
+                    Log.v("location:",intent.getExtras().get("coordinates").toString());
+                }
+            };
+        }
+        registerReceiver(broadcastReceiver,new IntentFilter("location_update"));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if(broadcastReceiver != null){
+            unregisterReceiver(broadcastReceiver);
+        }
+    }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -354,7 +443,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if (mLocationPermission) {
 
                     Toast.makeText(getApplicationContext(),"Permission Granted...!",Toast.LENGTH_SHORT).show();
-                    checkLocationOn();
+                    //checkLocationOn();
+                    allSet();
 
 
                 }else{
